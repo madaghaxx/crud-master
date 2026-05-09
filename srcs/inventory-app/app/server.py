@@ -33,3 +33,33 @@ class Movie(db.Model):
     
 with app.app_context():
     db.create_all()
+
+@app.route('/api/movies', methods=['GET'])
+def get_movies():
+    title = request.args.get('title')
+    if title:
+        movies = Movie.query.filter(Movie.title.ilike(f'%{title}%')).all()
+    else:
+        movies = Movie.query.all()
+    movies_list = []
+
+    for movie in movies:
+        movies_list.append(movie.to_dict())
+    return jsonify(movies_list), 200
+
+@app.route('/api/movies', methods=['POST'])
+def create_movies():
+    data = request.get_json()
+
+    if not data or not data.get('title') or not data.get('description'):
+        return jsonify({"error": "Title and description are required"}), 400
+    
+    new_movie = Movie(
+        title=data.get('title'),
+        description=data.get('description')
+    )
+
+    db.session.add(new_movie)
+    db.session.commit()
+
+    return jsonify(new_movie.to_dict()), 201
