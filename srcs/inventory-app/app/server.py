@@ -41,6 +41,7 @@ def get_movies():
         movies = Movie.query.filter(Movie.title.ilike(f'%{title}%')).all()
     else:
         movies = Movie.query.all()
+
     movies_list = []
 
     for movie in movies:
@@ -63,3 +64,35 @@ def create_movies():
     db.session.commit()
 
     return jsonify(new_movie.to_dict()), 201
+
+@app.route('/app/movies', methods=['DELETE'])
+def delete_all_movies():
+    db.session.query(Movie).delete()
+    db.session.commit()
+    return jsonify({"message": "All movies deleted"}), 200
+
+@app.route('/api/movies/<int:id>', methods=['GET'])
+def get_movie(id):
+    movie = Movie.query.get_or_404(id)
+    return jsonify(movie.to_dict()), 200
+
+@app.route('/api/movies/<int:id>', methods=['PUT'])
+def update_movie(id):
+    movie = Movie.query.get_or_404(id)
+    data = request.get_json()
+
+    movie.title = data.get('title', movie.title)
+    movie.description = data.get('description', movie.description)
+
+    db.session.commit()
+    return jsonify(movie.to_dict()), 200
+
+@app.route('/api/movies/<int:id>', methods=['DELETE'])
+def delete_movie(id):
+    movie = Movie.query.get_or_404(id)
+    db.session.delete(movie)
+    db.session.commit()
+    return jsonify({"message": f"Movie {id} deleted"}), 200
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)

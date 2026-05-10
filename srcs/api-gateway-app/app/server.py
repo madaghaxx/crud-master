@@ -1,5 +1,5 @@
-import os, requests
-from flask import Flask, request
+import os, requests, pika, json
+from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,6 +18,17 @@ def proxy_inventory(path):
         allow_redirects=False
     )
     return (resp.content, resp.status_code, resp.headers.items())
+
+@app.route('/api/billing', methods=['POST'])
+def post_billing():
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host=os.getenv('RABBITMQ_HOST')))
+    channel = connection.channel()
+    channel.queue_declare(queue=os.getenv('BILLING_QUEUE'))
+    
+    channel.basic_publish(exchange='', routing_key=os.getenv('BILLING_QUEUE'), body=json.dumps(request.json))
+    connection.close()
+    return jsonify({"message": "Message posted"}), 200
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
