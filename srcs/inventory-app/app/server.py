@@ -65,7 +65,7 @@ def create_movies():
 
     return jsonify(new_movie.to_dict()), 201
 
-@app.route('/app/movies', methods=['DELETE'])
+@app.route('/api/movies', methods=['DELETE'])
 def delete_all_movies():
     db.session.query(Movie).delete()
     db.session.commit()
@@ -95,4 +95,4 @@ def delete_movie(id):
     return jsonify({"message": f"Movie {id} deleted"}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, debug=True)
