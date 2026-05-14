@@ -1,0 +1,301 @@
+openapi: "3.0.3"
+info:
+  title: crud-master API Gateway
+  version: "1.0.0"
+  description: |
+    The API Gateway acts as the single entry point for the crud-master movie streaming platform.
+    It proxies requests to the **Inventory API** (via HTTP) and publishes billing events to the
+    **Billing API** (via RabbitMQ).
+
+    - **Inventory API** is running on `inventory-vm` (192.168.56.11:8080)
+    - **Billing API** is running on `billing-vm` (192.168.56.13)
+    - The gateway itself is exposed at `http://localhost:8080` on the host machine
+
+servers:
+  - url: http://localhost:8080
+    description: API Gateway (forwarded from gateway-vm via Vagrant)
+
+tags:
+  - name: Movies
+    description: Inventory API – CRUD operations on the movies database
+  - name: Billing
+    description: Billing API – Publish payment events via RabbitMQ
+
+paths:
+  /api/movies:
+    get:
+      tags: [Movies]
+      summary: Get all movies
+      description: Returns all movies in the inventory. Optionally filter by title using the `title` query parameter.
+      parameters:
+        - in: query
+          name: title
+          schema:
+            type: string
+          required: false
+          description: Filter movies whose title contains this string (case-insensitive)
+          example: inception
+      responses:
+        "200":
+          description: A list of movies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Movie"
+              example:
+                - id: 1
+                  title: Inception
+                  description: A mind-bending sci-fi thriller by Christopher Nolan.
+        "502":
+          $ref: "#/components/responses/GatewayError"
+
+    post:
+      tags: [Movies]
+      summary: Create a new movie
+      description: Adds a new movie entry to the inventory database.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MovieInput"
+            example:
+              title: Inception
+              description: A mind-bending sci-fi thriller by Christopher Nolan.
+      responses:
+        "201":
+          description: Movie created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Movie"
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Title and description are required
+        "502":
+          $ref: "#/components/responses/GatewayError"
+
+    delete:
+      tags: [Movies]
+      summary: Delete all movies
+      description: Permanently removes all movies from the inventory database.
+      responses:
+        "200":
+          description: All movies deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              example:
+                message: All movies deleted
+        "502":
+          $ref: "#/components/responses/GatewayError"
+
+  /api/movies/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Unique identifier of the movie
+        example: 1
+
+    get:
+      tags: [Movies]
+      summary: Get a movie by ID
+      description: Returns a single movie entry by its unique ID.
+      responses:
+        "200":
+          description: Movie found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Movie"
+        "404":
+          description: Movie not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Movie not found
+        "502":
+          $ref: "#/components/responses/GatewayError"
+
+    put:
+      tags: [Movies]
+      summary: Update a movie by ID
+      description: Updates the title and/or description of an existing movie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MovieInput"
+            example:
+              title: Inception (Director's Cut)
+              description: Extended version of the mind-bending sci-fi thriller.
+      responses:
+        "200":
+          description: Movie updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Movie"
+        "400":
+          description: Missing or invalid JSON body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Movie not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/GatewayError"
+
+    delete:
+      tags: [Movies]
+      summary: Delete a movie by ID
+      description: Permanently removes a single movie from the inventory.
+      responses:
+        "200":
+          description: Movie deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              example:
+                message: Movie 1 deleted
+        "404":
+          description: Movie not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/GatewayError"
+
+  /api/billing:
+    post:
+      tags: [Billing]
+      summary: Submit a billing order
+      description: |
+        Publishes a billing message to the RabbitMQ `billing_queue`.
+        The gateway accepts this request even if the Billing API is not running.
+        Messages will be processed by the Billing API when it starts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingOrder"
+            example:
+              user_id: "3"
+              number_of_items: "5"
+              total_amount: "180"
+      responses:
+        "200":
+          description: Message published to RabbitMQ successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              example:
+                message: Message posted
+        "400":
+          description: Invalid or missing JSON body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Could not connect to RabbitMQ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    Movie:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Auto-generated unique identifier
+          example: 1
+        title:
+          type: string
+          description: Movie title
+          example: Inception
+        description:
+          type: string
+          description: Movie description
+          example: A mind-bending sci-fi thriller by Christopher Nolan.
+      required: [id, title, description]
+
+    MovieInput:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Movie title
+          example: Inception
+        description:
+          type: string
+          description: Movie description
+          example: A mind-bending sci-fi thriller by Christopher Nolan.
+      required: [title, description]
+
+    BillingOrder:
+      type: object
+      properties:
+        user_id:
+          type: string
+          description: ID of the user placing the order
+          example: "3"
+        number_of_items:
+          type: string
+          description: Number of items in the order
+          example: "5"
+        total_amount:
+          type: string
+          description: Total cost of the order
+          example: "180"
+      required: [user_id, number_of_items, total_amount]
+
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Operation successful
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Something went wrong
+
+  responses:
+    GatewayError:
+      description: Gateway could not reach the Inventory API
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Gateway could not reach Inventory: Connection refused"
