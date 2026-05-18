@@ -1,0 +1,282 @@
+{
+  "info": {
+    "name": "crud-master API Gateway",
+    "description": "Postman collection for testing the crud-master API Gateway. All requests target the gateway at http://localhost:8080 and cover Inventory plus Billing publish endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /api/movies – Get all movies",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response is an array', function () {",
+              "    pm.expect(pm.response.json()).to.be.an('array');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8080/api/movies",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "movies"]
+        }
+      }
+    },
+    {
+      "name": "GET /api/movies?title= – Search movies by title",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response is an array', function () {",
+              "    pm.expect(pm.response.json()).to.be.an('array');",
+              "});",
+              "pm.test('All results contain the search term in title', function () {",
+              "    var results = pm.response.json();",
+              "    results.forEach(function(movie) {",
+              "        pm.expect(movie.title.toLowerCase()).to.include('inception');",
+              "    });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8080/api/movies?title=inception",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "movies"],
+          "query": [{ "key": "title", "value": "inception" }]
+        }
+      }
+    },
+    {
+      "name": "POST /api/movies – Create a movie",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 201', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Response has id, title, description', function () {",
+              "    var json = pm.response.json();",
+              "    pm.expect(json).to.have.property('id');",
+              "    pm.expect(json).to.have.property('title');",
+              "    pm.expect(json).to.have.property('description');",
+              "});",
+              "pm.test('Title matches request', function () {",
+              "    pm.expect(pm.response.json().title).to.eql('Inception');",
+              "});",
+              "// Save movie id for later tests",
+              "pm.collectionVariables.set('movie_id', pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Inception\",\n  \"description\": \"A mind-bending sci-fi thriller by Christopher Nolan.\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/movies",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "movies"]
+        }
+      }
+    },
+    {
+      "name": "GET /api/movies/:id – Get movie by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response has id, title, description', function () {",
+              "    var json = pm.response.json();",
+              "    pm.expect(json).to.have.property('id');",
+              "    pm.expect(json).to.have.property('title');",
+              "    pm.expect(json).to.have.property('description');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8080/api/movies/{{movie_id}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "movies", "{{movie_id}}"]
+        }
+      }
+    },
+    {
+      "name": "PUT /api/movies/:id – Update a movie",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Title was updated', function () {",
+              "    pm.expect(pm.response.json().title).to.eql('Inception (Director\\'s Cut)');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Inception (Director's Cut)\",\n  \"description\": \"Extended version of the mind-bending sci-fi thriller.\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/movies/{{movie_id}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "movies", "{{movie_id}}"]
+        }
+      }
+    },
+    {
+      "name": "DELETE /api/movies/:id – Delete a movie by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response has message', function () {",
+              "    pm.expect(pm.response.json()).to.have.property('message');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "http://localhost:8080/api/movies/{{movie_id}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "movies", "{{movie_id}}"]
+        }
+      }
+    },
+    {
+      "name": "DELETE /api/movies – Delete all movies",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response confirms deletion', function () {",
+              "    pm.expect(pm.response.json()).to.have.property('message');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "http://localhost:8080/api/movies",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "movies"]
+        }
+      }
+    },
+    {
+      "name": "POST /api/billing – Publish billing order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response confirms message was posted', function () {",
+              "    pm.expect(pm.response.json()).to.have.property('message');",
+              "    pm.expect(pm.response.json().message).to.eql('Message posted');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"3\",\n  \"number_of_items\": \"5\",\n  \"total_amount\": \"180\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/billing",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "billing"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "movie_id",
+      "value": "1",
+      "description": "Auto-set by POST /api/movies test"
+    }
+  ]
+}
