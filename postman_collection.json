@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "crud-master API Gateway",
-    "description": "Postman collection for testing the crud-master API Gateway (Inventory endpoints). All requests target the gateway at http://localhost:8080.",
+    "description": "Postman collection for testing the crud-master API Gateway. All requests target the gateway at http://localhost:8080 and cover Inventory plus Billing publish endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -233,6 +233,41 @@
           "host": ["localhost"],
           "port": "8080",
           "path": ["api", "movies"]
+        }
+      }
+    },
+    {
+      "name": "POST /api/billing – Publish billing order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response confirms message was posted', function () {",
+              "    pm.expect(pm.response.json()).to.have.property('message');",
+              "    pm.expect(pm.response.json().message).to.eql('Message posted');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"3\",\n  \"number_of_items\": \"5\",\n  \"total_amount\": \"180\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/billing",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "billing"]
         }
       }
     }

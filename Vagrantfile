@@ -52,19 +52,19 @@ Vagrant.configure("2") do |config|
     gateway.vm.provision "shell", path: "scripts/gateway.sh", env: env_vars
   end
 
-  # config.vm.define "billing-vm" do |billing|
-  #   billing.vm.hostname = "billing-vm"
-  #   billing.vm.network "private_network", ip: "192.168.56.13"
-  #   billing.vm.network "forwarded_port", guest: 15672, host: 15672, host_ip: "127.0.0.1", auto_correct: true
-  #   billing.vm.synced_folder "./srcs/billing-app", "/home/vagrant/billing-app"
+  config.vm.define "billing-vm" do |billing|
+    billing.vm.hostname = "billing-vm"
+    billing.vm.network "private_network", ip: "192.168.56.13"
+    billing.vm.network "forwarded_port", guest: 15672, host: 15672, host_ip: "127.0.0.1", auto_correct: true
+    billing.vm.synced_folder "./srcs/billing-app", "/home/vagrant/billing-app"
 
-  #   billing.vm.provider "virtualbox" do |vb|
-  #     vb.name = "billing-vm"
-  #     vb.gui = false
-  #     vb.memory = "1536"
-  #     vb.cpus = 1
-  #   end
+    billing.vm.provider "virtualbox" do |vb|
+      vb.name = "billing-vm"
+      vb.gui = false
+      vb.memory = "1536"
+      vb.cpus = 1
+    end
 
-  #   billing.vm.provision "shell", path: "scripts/billing.sh", env: env_vars
-  # end
+    billing.vm.provision "shell", path: "scripts/billing.sh", env: env_vars
+  end
 end

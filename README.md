@@ -15,11 +15,15 @@ Host (localhost:8080)
 │ Port 8080        │                     │  (movies_db)         │
 └──────────────────┘                     └──────────────────────┘
         │
-        │  RabbitMQ (disabled — billing-vm not active)
+        │  RabbitMQ
         ▼
 ┌──────────────────┐
-│   billing-vm     │  ← currently commented out
+│   billing-vm     │
 │ 192.168.56.13    │
+│ RabbitMQ +       │
+│ Billing consumer │
+│ PostgreSQL       │
+│ (billing_db)     │
 └──────────────────┘
 ```
 
@@ -29,7 +33,7 @@ Host (localhost:8080)
 |-----------------|-----------------------------------------|
 | API Gateway     | Python 3, Flask, PM2                    |
 | Inventory API   | Python 3, Flask, SQLAlchemy, PostgreSQL |
-| Billing API     | Python 3, pika (RabbitMQ) — disabled    |
+| Billing API     | Python 3, pika, SQLAlchemy, PostgreSQL  |
 | VM management   | Vagrant + VirtualBox                    |
 | Process manager | PM2                                     |
 
@@ -53,7 +57,15 @@ All variables are defined in `.env` at the project root. This file is committed 
 | `INVENTORY_DB_PASSWORD`| PostgreSQL password                      | `inventory_password` |
 | `INVENTORY_DB_HOST`    | DB host (inside inventory-vm)            | `127.0.0.1`        |
 | `INVENTORY_DB_PORT`    | DB port                                  | `5432`             |
+| `BILLING_VM_IP`        | IP of billing-vm                         | `192.168.56.13`    |
+| `BILLING_DB_NAME`      | Billing PostgreSQL database name         | `billing_db`       |
+| `BILLING_DB_USER`      | Billing PostgreSQL user                  | `billing_user`     |
+| `BILLING_DB_PASSWORD`  | Billing PostgreSQL password              | `billing_password` |
+| `BILLING_DB_HOST`      | DB host (inside billing-vm)              | `127.0.0.1`        |
+| `BILLING_DB_PORT`      | Billing DB port                          | `5432`             |
 | `RABBITMQ_HOST`        | RabbitMQ host (billing-vm)               | `192.168.56.13`    |
+| `RABBITMQ_PORT`        | RabbitMQ AMQP port                       | `5672`             |
+| `RABBITMQ_VHOST`       | RabbitMQ virtual host                    | `/`                |
 | `RABBITMQ_USER`        | RabbitMQ user                            | `billing_rmq_user` |
 | `RABBITMQ_PASSWORD`    | RabbitMQ password                        | `billing_rmq_password` |
 | `BILLING_QUEUE`        | RabbitMQ queue name                      | `billing_queue`    |
@@ -74,9 +86,11 @@ vagrant status
 # SSH into a VM
 vagrant ssh inventory-vm
 vagrant ssh gateway-vm
+vagrant ssh billing-vm
 ```
 
 The API Gateway is forwarded to your host machine at **http://localhost:8080**.
+RabbitMQ Management is forwarded at **http://localhost:15672** using the RabbitMQ credentials from `.env`.
 
 ## API Endpoints
 
@@ -111,17 +125,24 @@ curl http://localhost:8080/api/movies
 curl "http://localhost:8080/api/movies?title=inception"
 ```
 
-### Billing (disabled)
+### Billing
 
 | Method | Endpoint       | Description                               |
 |--------|----------------|-------------------------------------------|
 | `POST` | `/api/billing` | Publish a billing message to RabbitMQ     |
 
-> billing-vm is currently commented out in the Vagrantfile. The `/api/billing` endpoint will return 500 until billing-vm is enabled.
+**Example: Publish a billing order**
+```bash
+curl -X POST http://localhost:8080/api/billing \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "3", "number_of_items": "5", "total_amount": "180"}'
+```
+
+The gateway publishes the request body to RabbitMQ. The billing consumer stores it in the `orders` table in `billing_db`. If `billing-api` is stopped but RabbitMQ is running, the gateway still accepts requests and messages remain queued until the consumer starts again.
 
 ## Testing
 
-A **Postman collection** is included at `postman_collection.json`. It covers all 7 inventory endpoints with automated test assertions.
+A **Postman collection** is included at `postman_collection.json`. It covers all 7 inventory endpoints and the billing publish endpoint with automated test assertions.
 
 **Import into Postman:**
 1. Open Postman → Import → Upload `postman_collection.json`
@@ -138,10 +159,28 @@ pm2 list
 # Stop a service (e.g. to test resilience)
 pm2 stop inventory-api
 pm2 stop gateway-api
+pm2 stop billing-api
 
 # Restart
 pm2 start inventory-api
 pm2 start gateway-api
+pm2 start billing-api
+```
+
+To test billing resilience:
+
+```bash
+vagrant ssh billing-vm
+pm2 stop billing-api
+exit
+
+curl -X POST http://localhost:8080/api/billing \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "3", "number_of_items": "5", "total_amount": "180"}'
+
+vagrant ssh billing-vm
+pm2 start billing-api
+sudo -u postgres psql -d billing_db -c "SELECT * FROM orders;"
 ```
 
 ## API Documentation
@@ -157,23 +196,28 @@ An **OpenAPI 3.0 specification** is available at `openapi.yaml`. You can visuali
 ├── .env                          # Environment variables (committed intentionally)
 ├── .gitignore
 ├── README.md
-├── Vagrantfile                   # Defines inventory-vm + gateway-vm
+├── Vagrantfile                   # Defines inventory-vm + gateway-vm + billing-vm
 ├── openapi.yaml                  # OpenAPI 3.0 spec for the API Gateway
 ├── postman_collection.json       # Postman test collection
 ├── scripts/
 │   ├── inventory.sh              # Provision script for inventory-vm
-│   └── gateway.sh                # Provision script for gateway-vm
+│   ├── gateway.sh                # Provision script for gateway-vm
+│   └── billing.sh                # Provision script for billing-vm
 └── srcs/
     ├── inventory-app/
-    │   ├── server.py         # Flask CRUD API
+    │   ├── server.py             # Flask CRUD API
     │   └── requirements.txt
-    └── api-gateway-app/
-        ├── server.py         # Flask proxy + RabbitMQ publisher
+    ├── api-gateway-app/
+    │   ├── server.py             # Flask proxy + RabbitMQ publisher
+    │   └── requirements.txt
+    └── billing-app/
+        ├── server.py             # RabbitMQ consumer + orders persistence
         └── requirements.txt
 ```
 
 ## Design Choices
 
-- **`server.py` inside `app/`**: The entry point lives in `app/` alongside other modules. PM2 is invoked from `$APP_DIR/app/` to keep the working directory consistent with module imports.
+- **Separate service directories**: Each service has its own `server.py` and `requirements.txt`, so it can be started manually with `python server.py` or managed by PM2 in its VM.
 - **Single `.env` file**: All credentials are centralised and injected into VMs via Vagrant's `env:` provisioner option, so no credentials are hard-coded in source files.
 - **PM2 in fork mode**: Python processes don't benefit from PM2's cluster mode, so fork mode is used. This is sufficient for process resilience and log management.
+- **Queue-first billing**: The gateway only publishes billing messages to RabbitMQ. The Billing API has no HTTP endpoints and processes pending messages when it starts.
