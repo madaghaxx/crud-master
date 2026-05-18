@@ -36,8 +36,8 @@ sudo apt-get install -y nodejs
 sudo npm install pm2 -g
 
 # App Setup
-APP_DIR="/home/vagrant/billing-app"
-VENV_DIR="/home/vagrant/venvs/billing-app"
+APP_DIR="/home/vagrant/billing_app"
+VENV_DIR="/home/vagrant/venvs/billing_app"
 mkdir -p $APP_DIR
 mkdir -p "$(dirname "$VENV_DIR")"
 chown -R vagrant:vagrant "$(dirname "$VENV_DIR")"
